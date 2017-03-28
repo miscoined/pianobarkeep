@@ -45,10 +45,7 @@ explain () {
 info () {
     cmd "i"
     # Match the current track line and format it nicely
-    grep -ox "|>  .*" "$logf" |
-        tail -2 |
-        sed 's/|>  //' |
-        notify
+    grep -ox "|>  .*" "$logf" | tail -2 | sed 's/|>  //' | notify
 }
 
 # Get the upcoming song list and print it
@@ -57,24 +54,25 @@ upcoming () {
     # Get the line number of the last call for upcoming songs
     linenum=$(grep -n "^	 0) \|^(i) No songs in queue." "$logf" | tail -1 | cut -d':' -f1)
     # Get the last set of upcoming songs and format it
-    tail -n+$linenum "$logf" |
-        sed 's/^(i) \|^	 //' |
-        notify
+    tail -n+$linenum "$logf" | sed 's/^(i) \|^	 //' | notify
 }
+
+# Retrieve the latest station list in a readable format
+askstation () {
+    grep -Pzo "\t 0\) .*\n(\t ?[1-9][0-9]*\) .*\n)*$" "$logf" |
+        # Trim leading whitespace
+        sed 's/^\s\+//' |
+        # Remove null line at EOF
+        head -n-1 |
+        # Retrieve the desired station number
+        ask | cut -d')' -f1
+}
+
 
 # Switch stations
 switch () {
     cmd "s"
-    cmd $(
-        # Retrieve the latest station list
-        grep -Pzo "	 0\) .. .*\n(	 [1-9][0-9]*\) .. .*\n)*$" "$logf" |
-            # Format it nicely
-            sed 's/^	 \([0-9]*\)) .. \(.*\)$/\1) \2/' |
-            # Remove the last garbage line
-            head -n -1 |
-            # Retrieve the desired station number
-            ask | cut -d')' -f1
-        )"\n"
+    cmd $(askstation)"\n"
 }
 
 # Toggle Quickmix stations
@@ -83,15 +81,7 @@ quickmix () {
     if grep -zoq '/!\\ Not a QuickMix station\..$' "$logf"; then
         notify "Not a QuickMix station"
     else
-        cmd $(
-            # Retrieve the latest station list
-            grep -Pzo "	 0\) .. .*\n(	 [1-9][0-9]*\) .. .*\n)*$" "$logf" |
-                # Remove leading whitespace
-                sed 's/^	 //' |
-                # Remove the last garbage line
-                head -n-1 |
-                # Retrieve the desired station number
-                ask | cut -d')' -f1)"\n"
+        cmd $(askstation)"\n"
         cmd "\n"
     fi
 }
@@ -100,16 +90,15 @@ quickmix () {
 new () {
     cmd "c"
     cmd "$(ask "Create station from artist or title: ")""\n"
-    sleep 1
-    cmd $(
-        # Retrieve the latest station list
-        grep -Pzo "	 0\) .*\n(	 [1-9][0-9]*\) .*\n)*\n$" "$logf" |
-            # Remove leading whitespace
-            sed 's/^	 //' |
-            # Remove the last garbage line
-            head -n-1 |
-            # Retrieve the desired station number
-            ask | ask -d')' -f1)"\n"
+    sleep 3
+    cmd $(askstation)"\n"
+}
+
+# Delete the current station
+delete () {
+    cmd "d"
+    station="$(grep -ox '|>  Station ".*"' "$logf" | tail -1 | sed 's/^|>  Station "\(.*\)"$/\1/')"
+    cmd $(echo -e "Yes\nNo" | ask "Really delete '$station'?" | cut -c1)"\n"
 }
 
 # Launch pianobar on any command
@@ -127,8 +116,7 @@ if [[ -z $(pidof $pianobar) ]]; then
 
             # Send pianobar output to log file, filtering out cruft
             $pianobar |
-                sed -u 's/\[2K#   -[0-9][0-9]:[0-9][0-9]\/[0-9][0-9]:[0-9][0-9]\|\[2K//g' |
-                tee "$logf"
+                tee >(sed -u 's/\[2K#   -[0-9][0-9]:[0-9][0-9]\/[0-9][0-9]:[0-9][0-9]\|\[2K\|[]//g' > "$logf")
     esac
 fi
 
@@ -152,4 +140,5 @@ case "$1" in
     switch) switch;;
     quickmix) quickmix;;
     new) new;;
+    delete) delete;
 esac
