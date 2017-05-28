@@ -68,7 +68,6 @@ askstation () {
         ask | cut -d')' -f1
 }
 
-
 # Switch stations
 switch () {
     cmd "s"
@@ -87,19 +86,103 @@ quickmix () {
 }
 
 # Create a new station
-new () {
+create () {
     cmd "c"
-    cmd "$(ask "Create station from artist or title: ")""\n"
+    query="$(ask "Create station from artist or title: ")\n"
+    cmd "$query"
+    [[ $query == "\n" ]] && return
     sleep 3
     cmd $(askstation)"\n"
 }
 
+# Get the current station
+# Note that this relies on sending a command to FIFO, and so
+# cannot be performed in the middle of a query
+getstation () {
+    # Ask for station
+    cmd "i"
+    # Find the station entry
+    grep -ox '|>  Station ".*"' "$logf" |
+        # Get the relevent part
+        tail -1 |
+        # Filter out other cruft
+        sed 's/^|>  Station "\(.*\)"$/\1/'
+}
+
+# Get the current song and artist
+# Note that this relies on sending a command to FIFO, and so
+# cannot be performed in the middle of a query
+getinfo () {
+    cmd "i"
+    info="$(grep -ox "|>  .*" "$logf" | tail -1 | sed 's/|>  //')"
+    song="song) $(echo -e $info | sed 's/^"\([^"]*\)" by.*$/\1/')"
+    artist="artist) $(echo -e $info | sed 's/^.*by "\([^"]*\)".*$/\1/')"
+    echo -e "$song\n$artist"
+}
+
+# Create a new station from the current song or artist
+createfrom () {
+    prompt="$(getinfo)"
+    cmd "v"
+    cmd "$(echo -e "$prompt" | ask "Create station from song, or artist? " | cut -c1)\n"
+}
+
+# Create a new genre station
+creategenre () {
+    cmd "g"
+    cmd $(askstation)"\n"
+    cmd $(askstation)"\n"
+}
+
+# Create a new station from a shared one
+createshared () {
+    cmd "j"
+    cmd "$(ask "Station ID: ")\n"
+}
+
 # Delete the current station
 delete () {
+    station="$(getstation)"
     cmd "d"
-    station="$(grep -ox '|>  Station ".*"' "$logf" | tail -1 | sed 's/^|>  Station "\(.*\)"$/\1/')"
-    cmd $(echo -e "Yes\nNo" | ask "Really delete '$station'?" | cut -c1)"\n"
+    cmd $(echo -e "Yes\nNo" | ask "Really delete '$station'? " | cut -c1)"\n"
+    sleep 2
+    switch
 }
+
+# Rename the current station
+rename () {
+    station="$(getstation)"
+    cmd "r"
+    cmd "$(ask "Rename '$station' to: ")\n"
+}
+
+# Add music to the current station
+add () {
+    station="$(getstation)"
+    cmd "a"
+    query="$(ask "Add artist or song to '$station': ")\n"
+    cmd "$query"
+    [[ $query == "\n" ]] && return
+    sleep 3
+    cmd $(askstation)"\n"
+}
+
+# Bookmark a song or artist
+bookmark () {
+    prompt="$(getinfo)"
+    cmd "b"
+    cmd "$(echo -e "$prompt" | ask "Create station from song, or artist? " | cut -c1)\n"
+}
+
+# Delete seeds or feedback
+deletemeta () {
+    cmd "="
+    # TODO allow for differentiating when there's only one to delete
+    cmd "$(echo -e "Seeds\nFeedback" | ask "Delete seeds, or feedback? ")"
+    sleep 1
+    cmd "$(askstation)\n"
+}
+
 
 # Launch pianobar on any command
 if [[ -z $(pidof $pianobar) ]]; then
@@ -107,8 +190,9 @@ if [[ -z $(pidof $pianobar) ]]; then
         toggle|play|next|voldown|volup|volreset| \
             love|ban|tired| \
             explain|info|upcoming| \
-            switch|quickmix|new|newfrom|delete|rename|addgenre|addshared| \
-            bookmark|history|feedback|settings|"")
+            switch|quickmix|delete|rename|add| \
+            create|createfrom|creategenre|createshared| \
+            bookmark|history|deletemeta|"")
 
             rm "$ctlf" 2>/dev/null
             rm "$logf" 2>/dev/null
@@ -137,8 +221,17 @@ case "$1" in
     info)     info;;
     upcoming) upcoming;;
 
+    create) create;;
+    createfrom) createfrom;;
+    creategenre) creategenre;;
+    createshared) createshared;;
+
     switch) switch;;
     quickmix) quickmix;;
-    new) new;;
-    delete) delete;
+    delete) delete;;
+    rename) rename;;
+    add) add;;
+    bookmark) bookmark;;
+    deletemeta) deletemeta;;
+    #history
 esac
