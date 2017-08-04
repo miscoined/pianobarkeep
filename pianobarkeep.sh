@@ -187,8 +187,9 @@ deletemeta () {
 # Launch pianobar on any command
 if [[ -z $(pidof $pianobar) ]]; then
     case "$1" in
-        toggle|play|next|voldown|volup|volreset| \
-            love|ban|tired| \
+        toggle|play|pause|quit| \
+            voldown|volup|volreset| \
+            next|love|ban|tired| \
             explain|info|upcoming| \
             switch|quickmix|delete|rename|add| \
             create|createfrom|creategenre|createshared| \
@@ -208,11 +209,13 @@ case "$1" in
     toggle) cmd "p";;
     play)   cmd "P";;
     pause)  cmd "S";;
-    next)   cmd "n";;
-    voldown)  cmd "(";;
+    quit)   cmd "q";;
+
     volup)    cmd ")";;
+    voldown)  cmd "(";;
     volreset) cmd "^";;
 
+    next)   cmd "n";;
     love)   cmd "+";;
     ban)    cmd "-";;
     tired)  cmd "t";;
