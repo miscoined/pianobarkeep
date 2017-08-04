@@ -1,3 +1,7 @@
+## DISCONTINUED
+No longer developing this as Pandora has stopped providing support to Australia
+:(
+
 # Pianobarkeep
 
 pianobarkeep is a bash script that interacts with [pianobar](https://github.com/PromyLOPh/pianobar) through command-line arguments. It's designed specifically for use as a background program that can be controlled with a few keybindings.
